@@ -22,7 +22,7 @@ app.get("/restart", (req, res) => {
     conn
       .on("ready", () => {
         console.log("SSH Client :: Ready");
-        conn.exec("cd api && sudo yarn run build:prod", (err, stream) => {
+        conn.exec("sudo /etc/init.d/mysql restart && cd api && sudo yarn run build:prod", (err, stream) => {
           if (err) {
             res.status(500).send("Service restart failed.");
             called = false;
