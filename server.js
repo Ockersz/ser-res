@@ -58,6 +58,54 @@ app.get("/restart", (req, res) => {
   }
 });
 
+// app.get("/res-report", (req, res) => {
+//   if (res_report) {
+//     return res
+//       .status(400)
+//       .send("Report service restart already in progress. Try again later.");
+//   }
+
+//   res_report = true;
+//   const conn = new Client();
+
+//   try {
+//     conn
+//       .on("ready", () => {
+//         console.log("SSH Client :: Ready");
+//         conn.exec(
+//           "> nohup.out && sudo kill -9 $(sudo lsof -t -i:8080) && nohup java $JAVA_OPTS -jar report-service-0.0.1-SNAPSHOT.jar &",
+//           (err, stream) => {
+//             if (err) {
+//               res_report = false;
+//               res.status(500).send("Report restart failed.");
+//               return conn.end();
+//             }
+
+//             stream
+//               .on("close", (code, signal) => {
+//                 console.log(`Stream :: Close :: Code: ${code}, Signal: ${signal}`);
+//                 conn.end();
+//                 res_report = false;
+//                 res.status(200).send("Report service restarted successfully.");
+//               })
+//               .on("data", (data) => console.log(`STDOUT: ${data}`))
+//               .stderr.on("data", (data) => console.error(`STDERR: ${data}`));
+//           }
+//         );
+//       })
+//       .connect({
+//         host: "ec2-34-199-244-68.compute-1.amazonaws.com",
+//         port: 22,
+//         username: "ubuntu",
+//         privateKey: fs.readFileSync(path.resolve(__dirname, "./ockersz_api_key.pem")),
+//       });
+//   } catch (error) {
+//     console.error(error);
+//     res_report = false;
+//     res.status(500).send("Report restart failed.");
+//   }
+// });
+
 app.get("/res-report", (req, res) => {
   if (res_report) {
     return res
@@ -72,26 +120,27 @@ app.get("/res-report", (req, res) => {
     conn
       .on("ready", () => {
         console.log("SSH Client :: Ready");
-        conn.exec(
-          "> nohup.out && sudo kill -9 $(sudo lsof -t -i:8080) && nohup java $JAVA_OPTS -jar report-service-0.0.1-SNAPSHOT.jar &",
-          (err, stream) => {
-            if (err) {
-              res_report = false;
-              res.status(500).send("Report restart failed.");
-              return conn.end();
-            }
 
-            stream
-              .on("close", (code, signal) => {
-                console.log(`Stream :: Close :: Code: ${code}, Signal: ${signal}`);
-                conn.end();
-                res_report = false;
-                res.status(200).send("Report service restarted successfully.");
-              })
-              .on("data", (data) => console.log(`STDOUT: ${data}`))
-              .stderr.on("data", (data) => console.error(`STDERR: ${data}`));
+        const command = `
+          > nohup.out && \
+          sudo kill -9 $(sudo lsof -t -i:8080) && \
+          setsid nohup java $JAVA_OPTS -jar report-service-0.0.1-SNAPSHOT.jar >/dev/null 2>&1 < /dev/null & \
+          exit
+        `;
+
+        conn.exec(command, (err, stream) => {
+          if (err) {
+            console.error("SSH exec error:", err);
+            res_report = false;
+            res.status(500).send("Report restart failed.");
+            return conn.end();
           }
-        );
+
+          // Send response immediately without waiting for stream to close
+          res.status(200).send("Report service restart initiated.");
+          res_report = false;
+          conn.end();
+        });
       })
       .connect({
         host: "ec2-34-199-244-68.compute-1.amazonaws.com",
@@ -100,7 +149,7 @@ app.get("/res-report", (req, res) => {
         privateKey: fs.readFileSync(path.resolve(__dirname, "./ockersz_api_key.pem")),
       });
   } catch (error) {
-    console.error(error);
+    console.error("Connection error:", error);
     res_report = false;
     res.status(500).send("Report restart failed.");
   }
