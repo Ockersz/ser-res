@@ -4,7 +4,7 @@
   "description": "Back end to restart API",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "dev": "nodemon server.js"
   },
   "author": "Shahein Ockersz",
@@ -12,6 +12,12 @@
   "dependencies": {
     "express": "^4.21.1",
     "nodemon": "^3.1.7",
+    "redis": "^4.6.7",
+    "redlock": "^4.2.0",
     "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.1.1"
   }
 }
