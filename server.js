@@ -15,7 +15,9 @@ const REPORT_TTL = 30000;
 app.get("/restart", async (req, res) => {
   let lock;
   try {
+    console.log('Trying to acquire lock: restart');
     lock = await redlock.acquire(["locks:restart"], RESTART_TTL);
+    console.log("Lock acquired");
   } catch (err) {
     return res
       .status(400)
@@ -35,6 +37,7 @@ app.get("/restart", async (req, res) => {
               res.status(500).send("Service restart failed.");
               lock
                 .release()
+                .then(() => console.log("Lock released"))
                 .catch((err) => console.error("Failed to release lock:", err));
               return conn.end();
             }
@@ -47,6 +50,7 @@ app.get("/restart", async (req, res) => {
                 conn.end();
                 lock
                   .release()
+                  .then(() => console.log("Lock released"))
                   .catch((err) =>
                     console.error("Failed to release lock:", err)
                   );
@@ -68,6 +72,7 @@ app.get("/restart", async (req, res) => {
     if (lock)
       await lock
         .release()
+        .then(() => console.log("Lock released"))
         .catch((err) => console.error("Failed to release lock:", err));
     res.status(500).send("Service restart failed.");
   }
@@ -76,7 +81,9 @@ app.get("/restart", async (req, res) => {
 app.get("/res-report", async (req, res) => {
   let lock;
   try {
+    console.log("Trying to acquire lock: res-report");
     lock = await redlock.acquire(["locks:res-report"], REPORT_TTL);
+    console.log("Lock acquired");
   } catch (err) {
     return res
       .status(400)
@@ -96,6 +103,7 @@ app.get("/res-report", async (req, res) => {
               res.status(500).send("Report restart failed.");
               lock
                 .release()
+                .then(() => console.log("Lock released"))
                 .catch((err) => console.error("Failed to release lock:", err));
               return conn.end();
             }
@@ -108,6 +116,7 @@ app.get("/res-report", async (req, res) => {
                 conn.end();
                 lock
                   .release()
+                  .then(() => console.log("Lock released"))
                   .catch((err) =>
                     console.error("Failed to release lock:", err)
                   );
@@ -129,6 +138,7 @@ app.get("/res-report", async (req, res) => {
     if (lock)
       await lock
         .release()
+        .then(() => console.log("Lock released"))
         .catch((err) => console.error("Failed to release lock:", err));
     res.status(500).send("Report restart failed.");
   }
@@ -141,7 +151,7 @@ app.get("/", (req, res) => {
 // app.listen(PORT, () => {
 //   console.log(`Server running on port ${PORT}`);
 // });
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 
