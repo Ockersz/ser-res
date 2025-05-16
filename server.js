@@ -2,28 +2,22 @@ const express = require("express");
 const { Client } = require("ssh2");
 const fs = require("fs");
 const path = require("path");
-const redlock = require("./redlockInstance");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Lock TTL (time to live) in ms
-// const LOCK_TTL = 30 * 1000; // 30 seconds
-const RESTART_TTL = 45000;
-const REPORT_TTL = 30000;
+// In-memory flags to prevent concurrent operations
+let called = false;
+let res_report = false;
 
-app.get("/restart", async (req, res) => {
-  let lock;
-  try {
-    console.log('Trying to acquire lock: restart');
-    lock = await redlock.acquire(["locks:restart"], RESTART_TTL);
-    console.log("Lock acquired");
-  } catch (err) {
+app.get("/restart", (req, res) => {
+  if (called) {
     return res
       .status(400)
       .send("Restart is already in progress. Try again later.");
   }
 
+  called = true;
   const conn = new Client();
 
   try {
@@ -34,26 +28,16 @@ app.get("/restart", async (req, res) => {
           "sudo /etc/init.d/mysql restart && cd api && sudo yarn run build:prod",
           (err, stream) => {
             if (err) {
+              called = false;
               res.status(500).send("Service restart failed.");
-              lock
-                .release()
-                .then(() => console.log("Lock released"))
-                .catch((err) => console.error("Failed to release lock:", err));
               return conn.end();
             }
 
             stream
               .on("close", (code, signal) => {
-                console.log(
-                  `Stream :: Close :: Code: ${code}, Signal: ${signal}`
-                );
+                console.log(`Stream :: Close :: Code: ${code}, Signal: ${signal}`);
                 conn.end();
-                lock
-                  .release()
-                  .then(() => console.log("Lock released"))
-                  .catch((err) =>
-                    console.error("Failed to release lock:", err)
-                  );
+                called = false;
                 res.status(200).send("Service restarted successfully.");
               })
               .on("data", (data) => console.log(`STDOUT: ${data}`))
@@ -69,27 +53,19 @@ app.get("/restart", async (req, res) => {
       });
   } catch (error) {
     console.error(error);
-    if (lock)
-      await lock
-        .release()
-        .then(() => console.log("Lock released"))
-        .catch((err) => console.error("Failed to release lock:", err));
+    called = false;
     res.status(500).send("Service restart failed.");
   }
 });
 
-app.get("/res-report", async (req, res) => {
-  let lock;
-  try {
-    console.log("Trying to acquire lock: res-report");
-    lock = await redlock.acquire(["locks:res-report"], REPORT_TTL);
-    console.log("Lock acquired");
-  } catch (err) {
+app.get("/res-report", (req, res) => {
+  if (res_report) {
     return res
       .status(400)
       .send("Report service restart already in progress. Try again later.");
   }
 
+  res_report = true;
   const conn = new Client();
 
   try {
@@ -100,26 +76,16 @@ app.get("/res-report", async (req, res) => {
           "> nohup.out && sudo kill -9 $(sudo lsof -t -i:8080) && nohup java $JAVA_OPTS -jar report-service-0.0.1-SNAPSHOT.jar &",
           (err, stream) => {
             if (err) {
+              res_report = false;
               res.status(500).send("Report restart failed.");
-              lock
-                .release()
-                .then(() => console.log("Lock released"))
-                .catch((err) => console.error("Failed to release lock:", err));
               return conn.end();
             }
 
             stream
               .on("close", (code, signal) => {
-                console.log(
-                  `Stream :: Close :: Code: ${code}, Signal: ${signal}`
-                );
+                console.log(`Stream :: Close :: Code: ${code}, Signal: ${signal}`);
                 conn.end();
-                lock
-                  .release()
-                  .then(() => console.log("Lock released"))
-                  .catch((err) =>
-                    console.error("Failed to release lock:", err)
-                  );
+                res_report = false;
                 res.status(200).send("Report service restarted successfully.");
               })
               .on("data", (data) => console.log(`STDOUT: ${data}`))
@@ -135,11 +101,7 @@ app.get("/res-report", async (req, res) => {
       });
   } catch (error) {
     console.error(error);
-    if (lock)
-      await lock
-        .release()
-        .then(() => console.log("Lock released"))
-        .catch((err) => console.error("Failed to release lock:", err));
+    res_report = false;
     res.status(500).send("Report restart failed.");
   }
 });
@@ -148,9 +110,6 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Restart and Report API!");
 });
 
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
