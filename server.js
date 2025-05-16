@@ -5,7 +5,7 @@ const path = require("path");
 const redlock = require("./redlockInstance");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // Lock TTL (time to live) in ms
 // const LOCK_TTL = 30 * 1000; // 30 seconds
@@ -138,8 +138,11 @@ app.get("/", (req, res) => {
   res.send("Welcome to the Restart and Report API!");
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
 
 module.exports = app;
