@@ -97,7 +97,7 @@ app.get("/res-report", (req, res) => {
         host: "ec2-34-199-244-68.compute-1.amazonaws.com",
         port: 22,
         username: "ubuntu",
-        privateKey: fs.readFileSync(path.resolve(__dirname, "./ubuntu.pem")),
+        privateKey: fs.readFileSync(path.resolve(__dirname, "./res-ser-key.pem")),
       });
   } catch (error) {
     console.error(error);
